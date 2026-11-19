@@ -1,0 +1,66 @@
+
+name: Build HisabYar Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extract Android project
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found!"
+            exit 1
+          fi
+
+          mkdir android-src
+          unzip "$ZIP_FILE" -d android-src
+
+      - name: Find Android project
+        run: |
+          SETTINGS=$(find android-src -type f \( \
+            -name settings.gradle -o \
+            -name settings.gradle.kts \
+          \) | head -n 1)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle not found!"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HisabYar-APK
+          path: android-src/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          
